@@ -40,7 +40,7 @@ function ar_list_final = pair_list(list_1,list_2)
     end
 
     if switches < cur_switch
-        cur_switch = switches
+        cur_switch = switches;
         ar_list_final = ar_list;
     end
     if switches==0

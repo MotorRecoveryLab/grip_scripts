@@ -1,24 +1,27 @@
 
-function [] = experimentTrialEvents_v2(subj_id, pairs_or_num, type, tex_names, startInd, fn)
+function [] = experimentTrial_v2(subj_id, type, startInd, fn)
 
-% experimentTrialEvents(subj_id, pairs_or_num, type, tex_names, startInd, fn)
-%
-% Run an 2AFC experiment trial on a set of numerically-indexed input pairs,
+% experimentTrial_v2(subj_id, type)
+% Or: experimentTrial_v2(subj_id, type, startInd, fn)
+
+%% EXAMPLES:
+% To begin a 'practice' trial for subject test_person:
+% experimentTrial_v2('test_person','practice')
+
+% Or for example, to continue previous file 'test_person_static_v0' at pair index 6 use:
+% experimentTrial_v2('test_person', 'static', 6, 'test_person_practice_v0')
+
+%% FUNCTION DESCRIPTION
+% The function runs an 2AFC experiment trial on a set of numerically-indexed input pairs,
 % using Matlab's UI key events. The testing window must be open while testing is in progress.  
 %
 % subj_id: the name or ID of the subject being tested, which will be the
 % directory name for the output file.
 %
-% pairs_or_num: the input pairs, an [ n x 2 ] matrix of indices, OR a
-% single value indicating the total number of objects, for which a list of
-% all possible pairings will be generated.
-%
-% type: a string, e.g. 'practice' or 'test' which will be appended to
-% output filenames.
-%
-% tex_names: a cell array containing the long-form stimuli IDs or names. Each time 
-% the script runs, a file will be generated with these names and the same
-% filename prefix as the output.
+% type: a string, e.g. 'practice' or 'static' which will be appended to
+% output filenames. 'practice' will initiate a trial with 10 pairs for a
+% practice session; any other type will initiate a trial with the full 48
+% pairs. 
 %
 % startInd [optional, defaults to 1]: the starting index for the trials. Use this
 % only if you want to continue a previous session, using the fn argument to
@@ -29,11 +32,7 @@ function [] = experimentTrialEvents_v2(subj_id, pairs_or_num, type, tex_names, s
 % overwrite existing file if the start index is not set properly)
 
 
-% For example: 
-% experimentTrialEvents_v2('test_person',[1,2;1,4;4,3],'test_id',{'one','two','three'})
-
-
-%% Controls: 
+%% Experimeter Controls: 
 % For each trial, a pair of numbers will appear on the screen to indicate
 % the trial pair. 
 % The 's' key can be used to play a tone and indicate readiness for the
@@ -43,52 +42,62 @@ function [] = experimentTrialEvents_v2(subj_id, pairs_or_num, type, tex_names, s
 % key (followed by the other) to indicate their selection. After this 
 % sequence, a new trial pair will appear on the screen. 
 
-% The 'r' key can be used to revert one trial backwards, to repeat the
+% The 'r' key can be used to revert one trial backwards, i.e. to repeat the
 % previous trial. The previous trial will be overwritten.
 
 
 
+%% Initialize the texture names and the pairs 
+%          (**For this experiment only**)
+if ~strcmp(type, 'practice')
+    pairs = pair_list([1:8],[9:11]);
+else
+    pairs = [9, 11; 11,9; 11,10; 1,11; 11,4; 1,4; 8,1; 8,6; 6,3];
+end
+
+tex_names = {'20/16, diam. 0.1', '20/16, diam. 0.3', '20/16, diam. 0.5', ...
+    '16/16, diam 0.1', '16/16, diam. 0.3', '20/16, diam. 0.5', ...
+    '12/16 diam. 0.1', '12/16, diam 0.3', ...
+    '12/16 standard', '16/16 standard', '20/16 standard'}'
+
+
 close all
 
-if nargin < 3
-         type = 'none';
+if nargin < 2
+         type = 'no_type';
 end
-if nargin < 5
+if nargin < 3
         startInd = 1;
 end
 
+pairList = pairs;
+pairList = pairList(:,1:2);
 
-%Selects the output directory 
+%% Selects the output directory 
 homedir= uigetdir;  
 RAW_DATA_PATH = fullfile(homedir,subj_id);
 if ~exist(RAW_DATA_PATH)
     mkdir(RAW_DATA_PATH)
 end
+fileName = initializeList(RAW_DATA_PATH, subj_id, type)
 
-
-%pairList = makePairList(pairs_or_num, type, 100);
-pairList = pairs_or_num;
-pairList = pairList(:,1:2);
-
-%else
-%RAW_DATA_PATH = strcat('~/Documents/tactile/data/raw_data/triples/',subj_id,'/');
-%pairList = pairList(:,1:3);
-%end
-
+%% Initialize variables
 keysPressed = {};
 listLock=false;
 currentInd=startInd;
 inTrial=false;
 trialStartTime=-1;
 
-
-fileName = initializeList(RAW_DATA_PATH, subj_id, type)
 outMat = [pairList, -1*ones(length(pairList),3)];
-if nargin==4
+if nargin==2
     save(strcat(fileName(1:end-4), '_tex_names.mat'), 'tex_names');
 end
 
-if nargin==6
+if nargin==3
+     disp('Invalid inputs.')
+     return
+end
+if nargin>=4
     pairInd = startInd;
     exFileName = fullfile(RAW_DATA_PATH,fn); 
     pl = struct2array(load(exFileName));
@@ -104,7 +113,7 @@ end
 save(fileName,'outMat');
 
 
-%% Create the basic UI
+%% Create the basic UI, and then begin
 S.fh = figure('units','pixels',...
               'position',[0 0 500 250],...
               'menubar','none',...
@@ -135,23 +144,7 @@ S.tx = uicontrol('style','text',...
                  'FontSize', 12,...
                  'position',[50 20 400 50],...
                  'HorizontalAlignment', 'left');  
-   S.arrowtx1 = uicontrol('style','text',...
-                 'units','pixels',...
-                 'FontSize', 20,...
-                 'position',[220 10 30 30],...
-                 'HorizontalAlignment', 'center',...
-                 'fontweight','bold', ...
-                 'string', '<', ...
-                 'ForegroundColor', 'w');  
-             
-    S.arrowtx2 = uicontrol('style','text',...
-                 'units','pixels',...
-                 'FontSize', 20,...
-                 'position',[250 10 30 30],...
-                 'HorizontalAlignment', 'center',...
-                 'fontweight','bold', ...
-                'string', '>', ...
-                'ForegroundColor', 'w');
+
 guidata(S.fh,S)          
 
 numbered_tex_names = tex_names;
@@ -165,14 +158,14 @@ set(S.tx,'string','TESTING NOT STARTED')
 %set(S.txcur, 'string', 'Current pair:');
 %set(S.txnext, 'string', 'Next pair:');
 
-
-
 pairList
-
 dispStart()
 
 
+
+
 %% UI functions to detect key events
+
 function [] = fh_krfcn(H,E)          
 % Figure keypressfcn
 S = guidata(H);
@@ -190,6 +183,7 @@ if inTrial
     end
 end
 end
+
 
 function [] = fh_kpfcn(H,E)          
 % Figure keypressfcn
@@ -288,7 +282,9 @@ end
         disp([k,' released; Time (s): ', num2str(totalTime)])
         inTrial=false;
         if totalTime<0.45
-            disp('Error, time too short. Trial not recorded.')
+            disp(sprintf('\n'));
+            disp('WARNING: The time interval was suspiciously short.');
+            disp('Trial was not recorded and will be repeated.');
         else
             outMat(currentInd,(end-2):end) = [strcmp(k,'leftarrow'), strcmp(k,'rightarrow'), totalTime];
             save(fileName,'outMat');
@@ -297,7 +293,6 @@ end
         dispNextEntry()
     end
 end
-
 
 
 
